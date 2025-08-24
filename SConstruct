@@ -23,6 +23,7 @@ from SCons.Builder import ListEmitter
 
 
 def _helper_module(name, path):
+    """Import a module from an explicit path and register it under a given name."""
     spec = spec_from_file_location(name, path)
     module = module_from_spec(spec)
     spec.loader.exec_module(module)

@@ -27,12 +27,13 @@ _scu_folders = set()
 
 
 def set_scu_folders(scu_folders):
+    """Register folders participating in single compilation unit builds."""
     global _scu_folders
     _scu_folders = scu_folders
 
 
 def add_source_files_orig(self, sources, files, allow_gen=False):
-    # Convert string to list of absolute paths (including expanding wildcard)
+    """Expand wildcards and add source files, skipping stale generated ones."""
     if isinstance(files, str):
         # Exclude .gen.cpp files from globbing, to avoid including obsolete ones.
         # They should instead be added manually.
@@ -41,7 +42,6 @@ def add_source_files_orig(self, sources, files, allow_gen=False):
         if skip_gen_cpp and not allow_gen:
             files = [f for f in files if not str(f).endswith(".gen.cpp")]
 
-    # Add each path as compiled Object following environment (self) configuration
     for path in files:
         obj = self.Object(path)
         if obj in sources:
@@ -51,6 +51,7 @@ def add_source_files_orig(self, sources, files, allow_gen=False):
 
 
 def add_source_files_scu(self, sources, files, allow_gen=False):
+    """Handle SCU builds by injecting generated compilation units when required."""
     if self["scu_build"] and isinstance(files, str):
         if "*." not in files:
             return False
@@ -67,7 +68,6 @@ def add_source_files_scu(self, sources, files, allow_gen=False):
         if section_name not in (_scu_folders):
             return False
 
-        # Add all the gen.cpp files in the SCU directory
         add_source_files_orig(self, sources, subdir + ".scu/scu_*.gen.cpp", True)
         return True
     return False
@@ -76,6 +76,7 @@ def add_source_files_scu(self, sources, files, allow_gen=False):
 # Either builds the folder using the SCU system,
 # or reverts to regular build.
 def add_source_files(self, sources, files, allow_gen=False):
+    """Wrapper that chooses SCU-aware or standard source inclusion."""
     if not add_source_files_scu(self, sources, files, allow_gen):
         # Wraps the original function when scu build is not active.
         add_source_files_orig(self, sources, files, allow_gen)
@@ -107,7 +108,7 @@ def redirect_emitter(target, source, env):
 
 
 def disable_warnings(self):
-    # 'self' is the environment
+    """Disable compiler warnings for the current environment."""
     if self.msvc and not using_clang(self):
         self["WARNLEVEL"] = "/w"
     else:
@@ -115,7 +116,7 @@ def disable_warnings(self):
 
 
 def force_optimization_on_debug(self):
-    # 'self' is the environment
+    """Force high optimization levels when building debug templates."""
     if self["target"] == "template_release":
         return
     elif self.msvc:
@@ -125,10 +126,12 @@ def force_optimization_on_debug(self):
 
 
 def add_module_version_string(self, s):
+    """Append a version suffix for modules to the build metadata."""
     self.module_version_string += "." + s
 
 
 def get_version_info(module_version_string="", silent=False):
+    """Return version information dictionary for the current build."""
     build_name = "custom_build"
     if os.getenv("BUILD_NAME") is not None:
         build_name = str(os.getenv("BUILD_NAME"))
@@ -161,9 +164,9 @@ def get_version_info(module_version_string="", silent=False):
 
 
 def get_git_info():
+    """Return current commit hash and timestamp if the source is a Git repository."""
     os.chdir(base_folder)
 
-    # Parse Git hash if we're in a Git repo.
     git_hash = ""
     git_folder = ".git"
 
@@ -178,7 +181,6 @@ def get_git_info():
             head = file.readline().strip()
         if head.startswith("ref: "):
             ref = head[5:]
-            # If this directory is a Git worktree instead of a root clone.
             parts = git_folder.split("/")
             if len(parts) > 2 and parts[-2] == "worktrees":
                 git_folder = "/".join(parts[0:-2])
@@ -200,7 +202,6 @@ def get_git_info():
         else:
             git_hash = head
 
-    # Get the UNIX timestamp of the build commit.
     git_timestamp = 0
     if os.path.exists(".git"):
         try:
